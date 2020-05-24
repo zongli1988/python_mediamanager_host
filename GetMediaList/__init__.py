@@ -3,6 +3,7 @@ from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient, B
 import azure.functions as func
 from datetime import datetime, timedelta
 import json
+import os
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
@@ -19,8 +20,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 category = req_body.get('category')
 
         if category:
-            logging.info("category is something")
-            connect_str: str = 'DefaultEndpointsProtocol=https;AccountName=djbvideoappsto;AccountKey=Q2w9wi3v0JbTMUIV0kMc0K0kRHtWhTciQ4S7ZgdYSHhic59ZMQk/BlQPIFYQ/fft8uPQYymym97GgYxY4dbvOg==;EndpointSuffix=core.windows.net'
+            connect_str = os.environ["StorageConnectionString"]
 
             # Create the BlobServiceClient object which will be used to create a container client
             blob_service_client = BlobServiceClient.from_connection_string(
@@ -32,12 +32,11 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             container = blob_service_client.get_container_client(
                 container_name)
 
-            logging.info("Before List Blobs")
             blobs = container.list_blobs()
 
             ret = []
             for blob in blobs:
-                logging.info("Generate Token")
+
                 logging.info(blob.name)
                 sas_token = generate_blob_sas(
                     container.account_name,
@@ -46,16 +45,14 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                     account_key=blob_service_client.credential.account_key,
                     permission=BlobSasPermissions(read=True),
                     expiry=datetime.utcnow() + timedelta(hours=1))
-                logging.info("Before create video object")
+
                 video = {"Name": blob.name, "Account": container.account_name,
                          "Container": container.container_name, "SasToken": sas_token}
-                logging.info("Before append to list")
+
                 ret.append(video)
 
-            logging.info("Converting to JSON")
             json_dump = json.dumps(ret)
 
-            logging.info("About to return")
             print(json_dump)
             return func.HttpResponse(json_dump)
 

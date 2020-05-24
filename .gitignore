@@ -129,3 +129,4 @@ dmypy.json
 .pyre/
 
 .python_packages
+local.settings.json

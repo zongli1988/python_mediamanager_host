@@ -3,6 +3,7 @@ from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient, B
 import azure.functions as func
 from datetime import datetime, timedelta
 import json
+import os
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
@@ -21,7 +22,8 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 "Please upload content",
                 status_code=400
             )
-        connect_str: str = 'DefaultEndpointsProtocol=https;AccountName=djbvideoappsto;AccountKey=Q2w9wi3v0JbTMUIV0kMc0K0kRHtWhTciQ4S7ZgdYSHhic59ZMQk/BlQPIFYQ/fft8uPQYymym97GgYxY4dbvOg==;EndpointSuffix=core.windows.net'
+
+        connect_str = os.environ["StorageConnectionString"]
 
         # Create the BlobServiceClient object which will be used to create a container client
         blob_service_client = BlobServiceClient.from_connection_string(
