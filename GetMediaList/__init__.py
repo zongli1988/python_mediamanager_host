@@ -47,7 +47,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                     expiry=datetime.utcnow() + timedelta(hours=1))
 
                 video = {"Name": blob.name, "Account": container.account_name,
-                         "Container": container.container_name, "SasToken": sas_token}
+                         "Container": container.container_name, "SasToken": sas_token, "ContentType": blob.content_settings.content_type}
 
                 ret.append(video)
 
