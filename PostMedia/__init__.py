@@ -7,6 +7,9 @@ import os
 import io
 import PIL
 from PIL import Image, ExifTags
+from azure.cosmosdb.table.tableservice import TableService
+from azure.cosmosdb.table.models import Entity
+import uuid
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
@@ -37,16 +40,20 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         container = blob_service_client.get_container_client(
             container_name)
 
+        # TODO: Set user id based on authentication
+        content_id = createContentRecord(
+            "bfcc42bc-259d-42dc-bff6-dafda26ea22b", name, contentType)
+
         # Thumbnail Image
-        saveMedia(data, (500, 500), name, "thumbnail",
+        saveMedia(data, (500, 500), content_id, name, "thumbnail",
                   container, contentType)
 
         # Save Large Image
-        saveMedia(data, (1200, 1200), name, "large",
+        saveMedia(data, (1200, 1200), content_id, name, "large",
                   container, contentType)
 
         # Save Original Image
-        saveMedia(data, None, name, "original",
+        saveMedia(data, None, content_id, name, "original",
                   container, contentType)
 
         return func.HttpResponse(status_code=200)
@@ -56,13 +63,25 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         logging.error(ex)
 
 
-def saveMedia(data, size, name, sizeName, container: ContainerClient, contentType: str):
+def createContentRecord(user_id: str, name: str, content_type: str):
+    account_name = os.environ["StorageAccountName"]
+    account_key = os.environ["StorageAccountKey"]
+    table_service = TableService(
+        account_name=account_name, account_key=account_key)
+    record_id = str(uuid.uuid4())
+    record = {'PartitionKey': user_id, 'RowKey': record_id, 'Name': name,
+              'ContentType': content_type}
+    table_service.insert_entity('content', record)
+    return record_id
+
+
+def saveMedia(data, size, content_id: str, name: str, sizeName: str, container: ContainerClient, contentType: str):
     byteArr = data
     if contentType.lower().startswith("image") and size != None:  # Only convert if required
         byteArr = convertImage(data, size)
     metadata: dict(str, str) = {"SizeName": sizeName}
     content_settings = ContentSettings(content_type=contentType)
-    filename = convertFileName(name, sizeName)
+    filename = convertFileName(name, content_id, sizeName)
     container.upload_blob(
         filename, byteArr, content_settings=content_settings, metadata=metadata)
 
@@ -87,7 +106,7 @@ def convertImage(imageData, size=(500, 500)):
     return byteArr
 
 
-def convertFileName(name, version):
+def convertFileName(name, content_id, version):
     filename, file_extension = os.path.splitext(name)
-    filename = filename + "_" + version + file_extension
+    filename = content_id + "_" + version + file_extension
     return filename
