@@ -4,6 +4,8 @@ import azure.functions as func
 from datetime import datetime, timedelta
 import json
 import os
+from azure.cosmosdb.table.tableservice import TableService
+from azure.cosmosdb.table.models import Entity
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
@@ -32,12 +34,20 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             container = blob_service_client.get_container_client(
                 container_name)
 
-            blobs = container.list_blobs()
+            # TODO: Set user id based on authentication
+            content_records = getMatchingContent(
+                "bfcc42bc-259d-42dc-bff6-dafda26ea22b", 'NO CATEGORY YET')
+            # blobs = container.list_blobs()
 
             ret = []
-            for blob in blobs:
+            # for blob in blobs:
 
-                logging.info(blob.name)
+            #     logging.info(blob.name)
+            for record in content_records:
+                blob_name = record["id"] + "_thumb" + record['extension']
+                blob_client = container.get_blob_client(
+                    blob_name)
+                blob = blob_client.get_blob_properties()
                 sas_token = generate_blob_sas(
                     container.account_name,
                     container.container_name,
@@ -46,7 +56,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                     permission=BlobSasPermissions(read=True),
                     expiry=datetime.utcnow() + timedelta(hours=1))
 
-                video = {"Name": blob.name, "Account": container.account_name,
+                video = {"Id": record["id"], "Name": record["name"], "Account": container.account_name,
                          "Container": container.container_name, "SasToken": sas_token, "ContentType": blob.content_settings.content_type}
 
                 ret.append(video)
@@ -58,11 +68,26 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
         else:
             return func.HttpResponse(
-                "https://www.google.com/logos/doodles/2020/israel-kamakawiwooles-61st-birthday-6753651837108391.2-s.png",
-                status_code=200
+                "Please specify a category",
+                status_code=400
             )
 
     except Exception as ex:
         logging.exception('Exception:')
         logging.info(ex)
         logging.error(ex)
+
+
+def getMatchingContent(user_id: str, category: str):
+    account_name = os.environ["StorageAccountName"]
+    account_key = os.environ["StorageAccountKey"]
+    table_service = TableService(
+        account_name=account_name, account_key=account_key)
+    filterString = "PartitionKey eq '" + user_id + "'"
+    content_items = table_service.query_entities(
+        'content', filter=filterString)
+    results = []
+    for content in content_items:
+        results.append({"id": content.RowKey,
+                        "extension": content.Extension})
+    return results

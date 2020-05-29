@@ -16,10 +16,10 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
     try:
 
-        name = req.params.get('name')
-        if not name:
+        id = req.params.get('id')
+        if not id:
             return func.HttpResponse(
-                "Please specify a file name",
+                "Please specify an id",
                 status_code=400
             )
         data = req.get_body()
@@ -28,41 +28,22 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 "Please upload content",
                 status_code=400
             )
-
-        # Gather metadata and content types etc.
-        contentType = req.headers.get("Content-Type")
-
-        # Connect to blob storage
-        connect_str = os.environ["StorageConnectionString"]
-        blob_service_client = BlobServiceClient.from_connection_string(
-            connect_str)
-        container_name = "djbtest"
-        container = blob_service_client.get_container_client(
-            container_name)
-
-        # TODO: Set user id based on authentication
         user_id = "bfcc42bc-259d-42dc-bff6-dafda26ea22b"
-        content_id = createContentRecord(
-            user_id, name, contentType)
+        body = json.loads(data)
 
-        # Thumbnail Image
-        saveMedia(data, (500, 500), content_id, name, "thumb",
-                  container, contentType)
+        account_name = os.environ["StorageAccountName"]
+        account_key = os.environ["StorageAccountKey"]
+        table_service = TableService(
+            account_name=account_name, account_key=account_key)
+        record = table_service.get_entity("content", user_id, id)
+        if "Name" in body:
+            record["Name"] = body["Name"]
+        if "Description" in body:
+            record["Description"] = body["Description"]
 
-        # Save Large Image
-        saveMedia(data, (1200, 1200), content_id, name, "large",
-                  container, contentType)
+        table_service.update_entity('content', record)
 
-        # Save Original Image
-        saveMedia(data, None, content_id, name, "original",
-                  container, contentType)
-
-        result = {
-            "Id": content_id
-        }
-        json_result = json.dumps(result)
-
-        return func.HttpResponse(json_result, status_code=201)
+        return func.HttpResponse(status_code=202)
 
     except Exception as ex:
         logging.exception('Exception:')
