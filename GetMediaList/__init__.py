@@ -56,7 +56,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                     permission=BlobSasPermissions(read=True),
                     expiry=datetime.utcnow() + timedelta(hours=1))
 
-                video = {"Id": record["id"], "Name": record["name"], "Account": container.account_name,
+                video = {"Id": record["id"], "Name": record["name"], "Description": record["description"], "Account": container.account_name,
                          "Container": container.container_name, "SasToken": sas_token, "ContentType": blob.content_settings.content_type}
 
                 ret.append(video)
@@ -89,5 +89,7 @@ def getMatchingContent(user_id: str, category: str):
     results = []
     for content in content_items:
         results.append({"id": content.RowKey,
-                        "extension": content.Extension})
+                        "extension": content.Extension,
+                        "name": content.Name,
+                        "description": (content.Description if "Description" in content else "")})
     return results
