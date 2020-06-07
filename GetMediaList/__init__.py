@@ -56,8 +56,10 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                     permission=BlobSasPermissions(read=True),
                     expiry=datetime.utcnow() + timedelta(hours=1))
 
-                video = {"Id": record["id"], "Name": record["name"], "Description": record["description"], "Account": container.account_name,
-                         "Container": container.container_name, "SasToken": sas_token, "ContentType": blob.content_settings.content_type}
+                video = {"Id": record["id"], "Name": record["name"], "Description": record["description"],
+                         "Account": container.account_name, "FileName": blob_name,
+                         "Container": container.container_name, "SasToken": sas_token,
+                         "ContentType": blob.content_settings.content_type}
 
                 ret.append(video)
 
