@@ -3,3 +3,8 @@ azure-storage-blob
 pillow
 image
 azure-cosmosdb-table
+flask
+python-dotenv
+python-jose
+flask-cors
+six

@@ -11,11 +11,17 @@ from azure.cosmosdb.table.tableservice import TableService
 from azure.cosmosdb.table.models import Entity
 import uuid
 
+from __app__.shared_code import auth_helper  # pylint: disable=import-error
+from __app__.shared_code import user_helper  # pylint: disable=import-error
+from __app__.shared_code import blob_helper  # pylint: disable=import-error
 
+
+@auth_helper.requires_auth_decorator
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
     try:
 
+        # Validate arguments
         name = req.params.get('name')
         if not name:
             return func.HttpResponse(
@@ -32,30 +38,25 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         # Gather metadata and content types etc.
         contentType = req.headers.get("Content-Type")
 
-        # Connect to blob storage
-        connect_str = os.environ["StorageConnectionString"]
-        blob_service_client = BlobServiceClient.from_connection_string(
-            connect_str)
-        container_name = "djbtest"
-        container = blob_service_client.get_container_client(
-            container_name)
+        # Get content
+        user_id = user_helper.getUserId(req.userInfo)
+        blob_handler: blob_helper.BlobHelper = blob_helper.BlobHelper()
+        container = blob_handler.getContainer(user_id)
 
-        # TODO: Set user id based on authentication
-        user_id = "bfcc42bc-259d-42dc-bff6-dafda26ea22b"
-        content_id = createContentRecord(
+        content_id = blob_handler.createContentRecord(
             user_id, name, contentType)
 
         # Thumbnail Image
-        saveMedia(data, (500, 500), content_id, name, "thumb",
-                  container, contentType)
+        blob_handler.saveMedia(data, (500, 500), content_id, name, "thumb",
+                               container, contentType)
 
         # Save Large Image
-        saveMedia(data, (1200, 1200), content_id, name, "large",
-                  container, contentType)
+        blob_handler.saveMedia(data, (1200, 1200), content_id, name, "large",
+                               container, contentType)
 
         # Save Original Image
-        saveMedia(data, None, content_id, name, "original",
-                  container, contentType)
+        blob_handler.saveMedia(data, None, content_id, name, "original",
+                               container, contentType)
 
         result = {
             "Id": content_id
@@ -67,53 +68,3 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as ex:
         logging.exception('Exception:')
         logging.error(ex)
-
-
-def createContentRecord(user_id: str, filename: str, content_type: str):
-    account_name = os.environ["StorageAccountName"]
-    account_key = os.environ["StorageAccountKey"]
-    table_service = TableService(
-        account_name=account_name, account_key=account_key)
-    record_id = str(uuid.uuid4())
-    name, file_extension = os.path.splitext(filename)
-    record = {'PartitionKey': user_id, 'RowKey': record_id, 'Name': name,
-              'ContentType': content_type, "Extension": file_extension, 'FileName': filename}
-    table_service.insert_entity('content', record)
-    return record_id
-
-
-def saveMedia(data, size, content_id: str, name: str, sizeName: str, container: ContainerClient, contentType: str):
-    byteArr = data
-    if contentType.lower().startswith("image") and size != None:  # Only convert if required
-        byteArr = convertImage(data, size)
-    metadata: dict(str, str) = {"SizeName": sizeName}
-    content_settings = ContentSettings(content_type=contentType)
-    filename = convertFileName(name, content_id, sizeName)
-    container.upload_blob(
-        filename, byteArr, content_settings=content_settings, metadata=metadata)
-
-
-def convertImage(imageData, size=(500, 500)):
-    smallData = Image.open(io.BytesIO(imageData))
-    for orientation in ExifTags.TAGS.keys():
-        if ExifTags.TAGS[orientation] == 'Orientation':
-            break
-    exif = dict(smallData._getexif().items())
-    imageFormat = smallData.format
-    if exif[orientation] == 3:
-        smallData = smallData.rotate(180, expand=True)
-    elif exif[orientation] == 6:
-        smallData = smallData.rotate(270, expand=True)
-    elif exif[orientation] == 8:
-        smallData = smallData.rotate(90, expand=True)
-    smallData.thumbnail(size, Image.ANTIALIAS)
-    byteIO = io.BytesIO()
-    smallData.save(byteIO, format=imageFormat)
-    byteArr = byteIO.getvalue()
-    return byteArr
-
-
-def convertFileName(name, content_id, version):
-    filename, file_extension = os.path.splitext(name)
-    filename = content_id + "_" + version + file_extension
-    return filename
