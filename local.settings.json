@@ -2,6 +2,10 @@
   "IsEncrypted": false,
   "Values": {
     "AzureWebJobsStorage": "",
-    "FUNCTIONS_WORKER_RUNTIME": "python"
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "Auth0Domain": "https://djb.eu.auth0.com",
+    "StorageAccountName": "djbvideoappsto",
+    "StorageAccountKey": "nKHpXhLzVr+L0vZk5GHGjKrVaIv8L92Wx6clfV0aMiH28Cb1L9xjTRyAcOdFoZiCLRtcMKKpUq5ZuckmAuz53g==",
+    "StorageConnectionString": "DefaultEndpointsProtocol=https;AccountName=djbvideoappsto;AccountKey=nKHpXhLzVr+L0vZk5GHGjKrVaIv8L92Wx6clfV0aMiH28Cb1L9xjTRyAcOdFoZiCLRtcMKKpUq5ZuckmAuz53g==;EndpointSuffix=core.windows.net"
   }
 }

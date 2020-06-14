@@ -1,10 +1,8 @@
 import logging
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient, BlobProperties, generate_blob_sas, BlobSasPermissions
 import azure.functions as func
-
 import json
 import os
-
 from __app__.shared_code import auth_helper  # pylint: disable=import-error
 from __app__.shared_code import user_helper  # pylint: disable=import-error
 from __app__.shared_code import blob_helper  # pylint: disable=import-error
@@ -38,12 +36,13 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             blob = blob_client.get_blob_properties()
             sas_token = blob_handler.generateSasToken(container, blob)
 
-            media = {"Id": record["id"], "Name": record["name"], "Description": record["description"],
-                     "Account": container.account_name, "FileName": blob_name,
-                     "Container": container.container_name, "SasToken": sas_token,
-                     "ContentType": blob.content_settings.content_type}
+            item = {"Id": record["id"], "Name": record["name"], "Description": record["description"],
+                    "Account": container.account_name, "FileName": blob_name,
+                    "Container": container.container_name, "SasToken": sas_token,
+                    "ContentType": blob.content_settings.content_type}
+            item["Url"] = f'https://{item["Account"]}.blob.core.windows.net/{item["Container"]}/{item["FileName"]}?{item["SasToken"]}'
 
-            ret.append(media)
+            ret.append(item)
 
         json_dump = json.dumps(ret)
         return func.HttpResponse(json_dump)

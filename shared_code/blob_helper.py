@@ -9,11 +9,27 @@ import uuid
 import PIL
 from PIL import Image, ExifTags
 
+CACHED_DATA = {}
+
+
+class ContentItem:
+    def __init__(self, id: str):
+        self.id: str = id
+        self.extension: str
+        self.name: str
+        self.description: str
+
+    def toJSON(self):
+        return json.dumps(self, default=lambda o: o.__dict__,
+                          sort_keys=True, indent=4)
+
 
 class BlobHelper:
 
     def __init__(self):
         self.blob_service_client = self.getBlobServiceClient()
+        global CACHED_DATA
+        CACHED_DATA["Something"] = "something"
 
     def getBlobServiceClient(self):
         connect_str = os.environ["StorageConnectionString"]
@@ -35,6 +51,24 @@ class BlobHelper:
 
         return container
 
+    def getContentById(self, user_id: str, id: str) -> ContentItem:
+        account_name = os.environ["StorageAccountName"]
+        account_key = os.environ["StorageAccountKey"]
+        table_service = TableService(
+            account_name=account_name, account_key=account_key)
+        content = table_service.get_entity('content', user_id, id)
+        result = ContentItem(content.RowKey)
+        result.description = (
+            content.Description if "Description" in content else "")
+        result.extension = content.Extension
+        result.name = content.Name
+        return result
+
+    def getImageBlobNameByContentId(self, user_id: str, id: str, size: str):
+        content = self.getContentById(user_id, id)
+        blobName = id + '_' + size + content.extension
+        return blobName
+
     def getMatchingContent(self, user_id: str, category: str) -> list:
         account_name = os.environ["StorageAccountName"]
         account_key = os.environ["StorageAccountKey"]
@@ -52,13 +86,20 @@ class BlobHelper:
         return results
 
     def generateSasToken(self, container: ContainerClient, blob: BlobProperties) -> str:
+        key = container.container_name + "_" + blob.name
+        if key in CACHED_DATA:
+            item = CACHED_DATA[key]
+            if item["Expiry"] > datetime.utcnow() + timedelta(minutes=5):
+                return item["Token"]
+        expiry = datetime.utcnow() + timedelta(hours=1)
         sas_token = generate_blob_sas(
             container.account_name,
             container.container_name,
             blob.name,
             account_key=self.blob_service_client.credential.account_key,
             permission=BlobSasPermissions(read=True),
-            expiry=datetime.utcnow() + timedelta(hours=1))
+            expiry=expiry)
+        CACHED_DATA[key] = {"Expiry": expiry, "Token": sas_token}
         return sas_token
 
     def createContentRecord(self, user_id: str, filename: str, content_type: str):
