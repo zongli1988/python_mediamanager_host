@@ -11,7 +11,12 @@ from azure.cosmosdb.table.tableservice import TableService
 from azure.cosmosdb.table.models import Entity
 import uuid
 
+from __app__.shared_code import auth_helper  # pylint: disable=import-error
+from __app__.shared_code import user_helper  # pylint: disable=import-error
+from __app__.shared_code import blob_helper  # pylint: disable=import-error
 
+
+@auth_helper.requires_auth_decorator
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
     try:
