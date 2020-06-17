@@ -36,7 +36,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             )
 
         # Gather metadata and content types etc.
-        contentType = req.headers.get("Content-Type")
+        contentType: str = req.headers.get("Content-Type")
 
         # Get content
         user_id = user_helper.getUserId(req.userInfo)
@@ -46,17 +46,19 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         content_id = blob_handler.createContentRecord(
             user_id, name, contentType)
 
-        # Thumbnail Image
-        blob_handler.saveMedia(data, (500, 500), content_id, name, "thumb",
-                               container, contentType)
+        if contentType.lower() == "image/jpeg":
 
-        # Save Large Image
-        blob_handler.saveMedia(data, (1200, 1200), content_id, name, "large",
-                               container, contentType)
-
-        # Save Original Image
-        blob_handler.saveMedia(data, None, content_id, name, "original",
-                               container, contentType)
+            # Save Image
+            blob_handler.saveImage(
+                data, content_id, name, container, contentType)
+        elif contentType.lower() == "text/plain":
+            blob_handler.saveFile(data, content_id, content_id + '.txt',
+                                  container, None, contentType)
+        else:
+            return func.HttpResponse(
+                "Unknown content type",
+                status_code=400
+            )
 
         result = {
             "Id": content_id

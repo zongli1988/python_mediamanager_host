@@ -28,9 +28,14 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         user_id = user_helper.getUserId(req.userInfo)
         blob_handler: blob_helper.BlobHelper = blob_helper.BlobHelper()
         container = blob_handler.getContainer(user_id)
-        blobName = blob_handler.getImageBlobNameByContentId(
-            user_id, mediaId, 'large')
         content = blob_handler.getContentById(user_id, mediaId)
+        if content.content_type.lower() == 'image/jpeg':
+            blobName = blob_handler.getBlobNameByContentId(
+                user_id, mediaId, 'large')
+        else:
+            blobName = blob_handler.getBlobNameByContentId(
+                user_id, mediaId, None)
+
         blob_client = container.get_blob_client(blobName)
         blob = blob_client.get_blob_properties()
         sas_token = blob_handler.generateSasToken(container, blob)

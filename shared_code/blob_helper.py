@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import uuid
 import PIL
 from PIL import Image, ExifTags
+import urllib.parse
 
 CACHED_DATA = {}
 
@@ -18,6 +19,7 @@ class ContentItem:
         self.extension: str
         self.name: str
         self.description: str
+        self.content_type: str
 
     def toJSON(self):
         return json.dumps(self, default=lambda o: o.__dict__,
@@ -62,19 +64,26 @@ class BlobHelper:
             content.Description if "Description" in content else "")
         result.extension = content.Extension
         result.name = content.Name
+        result.content_type = content.ContentType
+
         return result
 
-    def getImageBlobNameByContentId(self, user_id: str, id: str, size: str):
+    def getBlobNameByContentId(self, user_id: str, id: str, size: str = None):
         content = self.getContentById(user_id, id)
-        blobName = id + '_' + size + content.extension
+        if size == None:
+            blobName = id + content.extension
+        else:
+            blobName = id + '_' + size + content.extension
         return blobName
 
-    def getMatchingContent(self, user_id: str, category: str) -> list:
+    def getMatchingContent(self, user_id: str, category: str, content_type: str) -> list:
         account_name = os.environ["StorageAccountName"]
         account_key = os.environ["StorageAccountKey"]
         table_service = TableService(
             account_name=account_name, account_key=account_key)
-        filterString = "PartitionKey eq '" + user_id + "'"
+        filterString = "PartitionKey eq '" + user_id + \
+            "' and ContentType eq '" + \
+            content_type + "'"
         content_items = table_service.query_entities(
             'content', filter=filterString)
         results = []
@@ -82,7 +91,8 @@ class BlobHelper:
             results.append({"id": content.RowKey,
                             "extension": content.Extension,
                             "name": content.Name,
-                            "description": (content.Description if "Description" in content else "")})
+                            "description": (content.Description if "Description" in content else ""),
+                            "content-type": content.ContentType})
         return results
 
     def generateSasToken(self, container: ContainerClient, blob: BlobProperties) -> str:
@@ -114,15 +124,32 @@ class BlobHelper:
         table_service.insert_entity('content', record)
         return record_id
 
+    def saveImage(self, data, content_id: str, name: str, container: ContainerClient, contentType: str):
+        # Thumbnail Image
+        self.saveMedia(data, (500, 500), content_id, name, "thumb",
+                       container, contentType)
+
+        # Save Large Image
+        self.saveMedia(data, (1200, 1200), content_id, name, "large",
+                       container, contentType)
+
+        # Save Original Image
+        self.saveMedia(data, None, content_id, name, "original",
+                       container, contentType)
+
     def saveMedia(self, data, size, content_id: str, name: str, sizeName: str, container: ContainerClient, contentType: str):
         byteArr = data
         if contentType.lower().startswith("image") and size != None:  # Only convert if required
             byteArr = self.convertImage(data, size)
         metadata: dict(str, str) = {"SizeName": sizeName}
-        content_settings = ContentSettings(content_type=contentType)
         filename = self.convertFileName(name, content_id, sizeName)
+        self.saveFile(byteArr, content_id, filename,
+                      container, metadata, contentType)
+
+    def saveFile(self, data, content_id: str, filename: str, container: ContainerClient, metadata, contentType: str):
+        content_settings = ContentSettings(content_type=contentType)
         container.upload_blob(
-            filename, byteArr, content_settings=content_settings, metadata=metadata)
+            filename, data, content_settings=content_settings, metadata=metadata)
 
     def convertImage(self, imageData, size=(500, 500)):
         smallData = Image.open(io.BytesIO(imageData))

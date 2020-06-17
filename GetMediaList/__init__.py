@@ -22,16 +22,25 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 status_code=400
             )
 
+        content_type = req.params.get('content_type')
+        if not content_type:
+            content_type = 'image/jpeg'
+
         # Get content
         user_id = user_helper.getUserId(req.userInfo)
         blob_handler: blob_helper.BlobHelper = blob_helper.BlobHelper()
         container = blob_handler.getContainer(user_id)
         content_records = blob_handler.getMatchingContent(
-            user_id, category)
+            user_id, category, content_type)
 
         ret = []
         for record in content_records:
-            blob_name = record["id"] + "_thumb" + record['extension']
+            if record['content-type'] == "image/jpeg":
+                # Get thumbnail for images (we store multiple copies)
+                blob_name = record["id"] + "_thumb" + record['extension']
+            else:
+                blob_name = record["id"] + record['extension']
+
             blob_client = container.get_blob_client(blob_name)
             blob = blob_client.get_blob_properties()
             sas_token = blob_handler.generateSasToken(container, blob)
