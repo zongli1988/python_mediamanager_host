@@ -10,6 +10,7 @@ import PIL
 from PIL import Image, ExifTags
 import urllib.parse
 
+
 CACHED_DATA = {}
 
 
